@@ -37,11 +37,12 @@ class BudgetDatabase:
         """
         return self.conn.execute(query).fetchall()
 
-    def get_category_data(self):
+    def get_category_data(self, type="Expense"):
         query = """
-        SELECT category, SUM(amount) FROM transactions WHERE type = 'Expense' GROUP BY category
+        SELECT category, SUM(amount) FROM transactions WHERE type = ? GROUP BY category
         """
-        return self.conn.execute(query).fetchall()
+        return self.conn.execute(query, (type,)).fetchall()
+
 
     def close(self):
         self.conn.close()

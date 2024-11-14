@@ -1,46 +1,56 @@
-from PyQt5.QtChart import QChart, QChartView, QPieSeries, QBarSeries, QBarSet, QValueAxis, QLineSeries
-from PyQt5.QtGui import QPainter
-from PyQt5.QtCore import Qt
+# charts.py
+from PyQt5.QtChart import QChart, QPieSeries, QLineSeries, QDateTimeAxis, QValueAxis
+from PyQt5.QtCore import Qt, QDateTime
 
-def create_pie_chart(data):
+def create_pie_chart(data, title="Distribution by Category"):
     series = QPieSeries()
+    total = sum(amount for _, amount in data)
+
     for category, amount in data:
-        series.append(category, amount)
+        slice_ = series.append(category, amount)
+        slice_.setLabel(f"{category} ({amount / total * 100:.1f}%)")
+        slice_.setLabelVisible()
+
     chart = QChart()
     chart.addSeries(series)
-    chart.setTitle("Expense Distribution by Category")
+    chart.setTitle(title)
     chart.legend().setAlignment(Qt.AlignBottom)
-    return chart
+    chart.legend().setLabelColor(Qt.black)
+    chart.setBackgroundBrush(Qt.white)
 
-def create_bar_chart(data):
-    series = QBarSeries()
-    for category, amount in data:
-        set_bar = QBarSet(category)
-        set_bar.append(amount)
-        series.append(set_bar)
-    chart = QChart()
-    chart.addSeries(series)
-    chart.setTitle("Expense by Category")
-    axisX = QValueAxis()
-    axisX.setTitleText("Categories")
-    axisY = QValueAxis()
-    axisY.setTitleText("Amount")
-    chart.setAxisX(axisX, series)
-    chart.setAxisY(axisY, series)
-    return chart
+    chart.setTheme(QChart.ChartThemeBlueCerulean)
+    chart.setAnimationOptions(QChart.AllAnimations)
+    chart.setAnimationDuration(1000)
 
-def create_line_chart(income_data, expense_data):
+    return chart
+    
+def create_line_chart(dates, income_data, expense_data):
     income_series = QLineSeries()
-    for i, amount in enumerate(income_data):
-        income_series.append(i, amount)
-
     expense_series = QLineSeries()
-    for i, amount in enumerate(expense_data):
-        expense_series.append(i, amount)
+
+    for date, income in zip(dates, income_data):
+        timestamp = QDateTime.fromString(date, "yyyy-MM-dd").toMSecsSinceEpoch()
+        income_series.append(timestamp, income)
+
+    for date, expense in zip(dates, expense_data):
+        timestamp = QDateTime.fromString(date, "yyyy-MM-dd").toMSecsSinceEpoch()
+        expense_series.append(timestamp, expense)
 
     chart = QChart()
     chart.addSeries(income_series)
     chart.addSeries(expense_series)
     chart.setTitle("Income and Expense Trends Over Time")
-    chart.createDefaultAxes()
+
+    axisX = QDateTimeAxis()
+    axisX.setFormat("MMM dd")
+    axisX.setTitleText("Date")
+    chart.addAxis(axisX, Qt.AlignBottom)
+    income_series.attachAxis(axisX)
+    expense_series.attachAxis(axisX)
+
+    axisY = QValueAxis()
+    axisY.setTitleText("Amount")
+    chart.addAxis(axisY, Qt.AlignLeft)
+    income_series.attachAxis(axisY)
+    expense_series.attachAxis(axisY)
     return chart
