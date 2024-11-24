@@ -2,10 +2,11 @@ import sys
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QRadioButton, QDateEdit, QTextEdit, QTableWidget, QTableWidgetItem,
-    QWidget, QStackedWidget
+    QWidget, QStackedWidget, QHeaderView
 )
-from PyQt5.QtChart import QLegend
 
+from PyQt5.QtChart import QLegend
+from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import QDateTime
 
@@ -127,9 +128,9 @@ class BudgetTracker(QMainWindow):
         title_label = QLabel("Overview")
         title_label.setStyleSheet("QLabel { color: black; font-size: 16px; font-weight: bold; }")
         
-        self.total_income_label = QLabel("Total Income: $0.00")
-        self.total_expense_label = QLabel("Total Expense: $0.00")
-        self.total_savings_label = QLabel("Savings: $0.00")
+        self.total_income_label = QLabel("Total Income: ₹0.00")
+        self.total_expense_label = QLabel("Total Expense: ₹0.00")
+        self.total_savings_label = QLabel("Savings: ₹0.00")
         
         self.expense_chart_view = QChartView()
         self.expense_chart_view.setRenderHint(QPainter.Antialiasing)
@@ -212,18 +213,137 @@ class BudgetTracker(QMainWindow):
     def show_transactions_page(self):
         self.update_transactions_table()
         self.central_widget.setCurrentWidget(self.transactions_page)
+        
 
     def update_transactions_table(self):
         transactions = self.db.get_all_transactions()
         self.transaction_table.setColumnCount(5)
         self.transaction_table.setHorizontalHeaderLabels(["Category", "Amount", "Type", "Date", "Description"])
         self.transaction_table.setRowCount(len(transactions))
-
+        
         for row, transaction in enumerate(transactions):
-            for col, data in enumerate(transaction[1:]):  # Skip ID column
-                self.transaction_table.setItem(row, col, QTableWidgetItem(str(data)))
-
+            for col, data in enumerate(transaction[1:]):  # Skip the ID column
+                item = QTableWidgetItem(str(data))
+                if row % 2 == 0:
+                    item.setBackground(QColor(240, 240, 240))  # Light gray for even rows
+                else:
+                    item.setBackground(QColor(255, 255, 255))  # White for odd row
+                item.setTextAlignment(Qt.AlignCenter)
+                self.transaction_table.setItem(row, col, item)
+        
         self.transaction_table.resizeColumnsToContents()
+        header = self.transaction_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        self.transaction_table.setSortingEnabled(True)
+
+        # Styling the transaction table
+        self.transaction_table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid #dcdcdc;
+                font-family: Arial;
+                font-size: 14px;
+                background-color: #fdfdfd;
+                color: #333333;
+                gridline-color: #e0e0e0;
+            }
+            QHeaderView::section {
+                background-color: #f0f0f0;
+                font-weight: bold;
+                border: 1px solid #dcdcdc;
+                padding: 5px;
+                text-align: center;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QTableWidget::item:selected {
+                background-color: #cce7ff;
+                color: #000000;
+            }
+        """)
+        self.transaction_table.verticalHeader().setDefaultSectionSize(30)
+
+        # Add filter layout and export button only once
+        if not hasattr(self, 'filter_layout_added') or not self.filter_layout_added:
+            self.filter_layout_added = True
+            export_button = QPushButton("Export to CSV")
+            export_button.setStyleSheet("""
+                QPushButton {
+                    background-color: black;
+                    color: white;
+                    border: none;
+                    padding: 10px;
+                    margin: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #333333;
+                }
+            """)
+            export_button.clicked.connect(self.export_transactions_to_csv)
+
+            # Filter inputs
+            category_filter = QLineEdit()
+            category_filter.setPlaceholderText("Filter by Category")
+            category_filter.setStyleSheet("""
+                QLineEdit {
+                    border: 1px solid #dcdcdc;
+                    padding: 5px;
+                }
+            """)
+            category_filter.textChanged.connect(lambda text: self.filter_transactions("Category", text))
+
+            type_filter = QLineEdit()
+            type_filter.setPlaceholderText("Filter by Type (Income/Expense)")
+            type_filter.setStyleSheet("""
+                QLineEdit {
+                    border: 1px solid #dcdcdc;
+                    padding: 5px;
+                }
+            """)
+            type_filter.textChanged.connect(lambda text: self.filter_transactions("Type", text))
+
+            # Layout for filters and export button
+            filter_layout = QHBoxLayout()
+            filter_layout.addWidget(category_filter)
+            filter_layout.addWidget(type_filter)
+            filter_layout.addWidget(export_button)
+
+            # Insert the filter layout only if it's not already added
+            self.transactions_page.layout().insertLayout(1, filter_layout)
+
+    # Method to filter transactions based on user input
+    def filter_transactions(self, column_name, filter_text):
+        column_map = {
+            "Category": 0,
+            "Type": 2
+        }
+        column_index = column_map.get(column_name, -1)
+        if column_index == -1:
+            return
+        for row in range(self.transaction_table.rowCount()):
+            item = self.transaction_table.item(row, column_index)
+            if item and filter_text.lower() in item.text().lower():
+                self.transaction_table.showRow(row)
+            else:
+                self.transaction_table.hideRow(row)
+
+    # Method to export transactions to a CSV file
+    def export_transactions_to_csv(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Transactions", "", "CSV Files (*.csv)")
+        if not file_path:
+            return
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            # Write headers
+            headers = [self.transaction_table.horizontalHeaderItem(col).text() for col in range(self.transaction_table.columnCount())]
+            writer.writerow(headers)
+
+            # Write data rows
+            for row in range(self.transaction_table.rowCount()):
+                row_data = [self.transaction_table.item(row, col).text() for col in range(self.transaction_table.columnCount())]
+                writer.writerow(row_data)
+
+
 
     def add_transaction(self):
         try:
@@ -254,9 +374,9 @@ class BudgetTracker(QMainWindow):
         expense_amount = sum(amount for trans_type, amount in transactions if trans_type == "Expense")
         savings = income_amount - expense_amount
         
-        self.total_income_label.setText(f"Total Income: ${income_amount:.2f}")
-        self.total_expense_label.setText(f"Total Expense: ${expense_amount:.2f}")
-        self.total_savings_label.setText(f"Savings: ${savings:.2f}")
+        self.total_income_label.setText(f"Total Income: ₹{income_amount:.2f}")
+        self.total_expense_label.setText(f"Total Expense: ₹{expense_amount:.2f}")
+        self.total_savings_label.setText(f"Savings: ₹{savings:.2f}")
         
         expense_chart = create_pie_chart(categories_expense, "Expense Distribution")
         income_chart = create_pie_chart(categories_income, "Income Distribution")
@@ -270,17 +390,12 @@ class BudgetTracker(QMainWindow):
         income_data = [amount for trans_type, amount in transactions if trans_type == "Income"]
         expense_data = [amount for trans_type, amount in transactions if trans_type == "Expense"]
         dates = [QDateTime.fromString(date, "yyyy-MM-dd") for _, _, _, _, date, _ in self.db.get_all_transactions()]
-        # pie_chart_expense = create_pie_chart(self.db.get_category_data(type="Expense"))
-        # pie_chart_income = create_pie_chart(self.db.get_category_data(type="Income"))
+        
         line_chart = create_line_chart(dates, income_data, expense_data)
         def on_back():
             self.central_widget.setCurrentWidget(self.main_page)
-        # analysis_dialog = AnalysisPage(pie_chart_income, pie_chart_expense, line_chart, on_back)
-        # analysis_dialog.setStyleSheet("background-color: white;")
-        # self.central_widget.addWidget(analysis_dialog)
-        # self.central_widget.setCurrentWidget(analysis_dialog)
-
-
+       
+       
     def set_black_white_theme(self):
         self.setStyleSheet("""
             QWidget {
