@@ -46,3 +46,10 @@ class BudgetDatabase:
 
     def close(self):
         self.conn.close()
+        
+    def delete_transaction(self, transaction_id):
+        query = "DELETE FROM transactions WHERE id = ?"
+        
+        self.conn.execute(query, (transaction_id,))
+        self.conn.commit()
+

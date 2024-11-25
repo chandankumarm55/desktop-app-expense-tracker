@@ -217,8 +217,8 @@ class BudgetTracker(QMainWindow):
 
     def update_transactions_table(self):
         transactions = self.db.get_all_transactions()
-        self.transaction_table.setColumnCount(5)
-        self.transaction_table.setHorizontalHeaderLabels(["Category", "Amount", "Type", "Date", "Description"])
+        self.transaction_table.setColumnCount(6)  # Add an extra column for the delete button
+        self.transaction_table.setHorizontalHeaderLabels(["Category", "Amount", "Type", "Date", "Description", "Delete"])
         self.transaction_table.setRowCount(len(transactions))
         
         for row, transaction in enumerate(transactions):
@@ -230,13 +230,36 @@ class BudgetTracker(QMainWindow):
                     item.setBackground(QColor(255, 255, 255))  # White for odd row
                 item.setTextAlignment(Qt.AlignCenter)
                 self.transaction_table.setItem(row, col, item)
+
+            # Add a delete button in the last column for each row
+            delete_button = QPushButton("Delete")
+            delete_button.setStyleSheet("""
+                QPushButton {
+                    background-color: red;
+                    color: white;
+                    border: none;
+                    padding: 5px;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: darkred;
+                }
+            """)
+            delete_button.clicked.connect(lambda checked, row=row: self.delete_transaction(transactions[row]))  # Use ID for deletion
+            self.transaction_table.setCellWidget(row, 5, delete_button)  # Place the button in the 6th column
         
         self.transaction_table.resizeColumnsToContents()
         header = self.transaction_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         self.transaction_table.setSortingEnabled(True)
 
+    def delete_transaction(self, transaction_id):
+        """Delete a transaction from the database."""
+        print(transaction_id)
+        self.db.delete_transaction(transaction_id[0])
+        self.update_transactions_table()  # Refresh the table after deletion       
         # Styling the transaction table
+
         self.transaction_table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid #dcdcdc;
