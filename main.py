@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QRadioButton, QDateEdit, QTextEdit, QTableWidget, QTableWidgetItem,
     QWidget, QStackedWidget, QHeaderView
 )
+from PyQt5.QtWidgets import QFileDialog
 
 from PyQt5.QtChart import QLegend
 from PyQt5.QtGui import QPainter, QColor
